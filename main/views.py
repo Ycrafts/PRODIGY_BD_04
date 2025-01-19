@@ -7,23 +7,32 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework import status
 from django.contrib.auth import authenticate
-from rest_framework.permissions import IsAuthenticated
 from .permissions import CustomUserPermission
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.utils.decorators import method_decorator
+from django.views.decorators.cache import cache_page
 
 class CustomUserViewSet(viewsets.ModelViewSet):
     serializer_class = CustomUserSerializer
     queryset = CustomUser.objects.all()
     permission_classes = [CustomUserPermission]
     
+    
     def get_permissions(self):
         if self.action in ['signup', 'login']:
             self.permission_classes = [AllowAny]
         return super().get_permissions()
     
+    @method_decorator(cache_page(60 * 15))  #15 minutes
+    def list(self, request, *args, **kwargs):
+        return super().list(request, *args, **kwargs)
+    
+    @method_decorator(cache_page(60 * 15))  #15 minutes
+    def retrieve(self, request, *args, **kwargs):
+        return super().retrieve(request, *args, **kwargs)
+
+    
     def create(self, request, *args, **kwargs):
-        # Disable the default POST method for /users/
         return Response(
             {"error": "This action is not allowed. Use the /api/users/signup/ endpoint to create a new user."},
             status=status.HTTP_405_METHOD_NOT_ALLOWED
@@ -37,6 +46,8 @@ class CustomUserViewSet(viewsets.ModelViewSet):
             serializer.save()
             return Response({"message": "User registered successfully."}, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
+    
     @action(detail=False, methods=['post'])
     def login(self, request):
         username = request.data.get('username')
